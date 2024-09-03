@@ -2,49 +2,28 @@ trigger:
 - main
 
 pool:
-  name: MySelfHostedAgents  # Use your self-hosted agent pool
+  vmImage: 'ubuntu-latest'
 
-variables:
-  buildDir: 'app/build/outputs/apk/release'
-  apkFile: '$(buildDir)/app-release.apk'
+steps:
+- checkout: self
+  fetchDepth: 1  # Fetch only the latest commit
 
-stages:
-- stage: Build
-  jobs:
-  - job: BuildAPK
-    steps:
-    - script: |
-        ./gradlew assembleRelease
-      displayName: 'Build Release APK'
-      
-    - script: |
-        mkdir -p $(Build.ArtifactStagingDirectory)/apk
-        cp $(buildDir)/*.apk $(Build.ArtifactStagingDirectory)/apk/
-      displayName: 'Copy APK to Staging Directory'
+- task: Gradle@2
+  displayName: 'Build Release APK'
+  inputs:
+    workingDirectory: ''
+    gradleWrapperFile: 'gradlew'
+    tasks: 'assembleRelease'
 
-    - publish: $(Build.ArtifactStagingDirectory)/apk
-      artifact: apk
+- task: CopyFiles@2
+  displayName: 'Copy APK to Staging Directory'
+  inputs:
+    contents: '**/*.apk'
+    targetFolder: '$(Build.ArtifactStagingDirectory)/apk'
 
-- stage: Deploy
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-  - job: DeployAPK
-    steps:
-    - script: |
-        curl -sSL https://sdk.cloud.google.com | bash
-        npm install -g google-play-publisher
-      displayName: 'Install gcloud and google-play-publisher'
-      
-    - script: |
-        echo $(serviceConnection:GooglePlayServiceAccount) > /tmp/keyfile.json
-        gcloud auth activate-service-account --key-file=/tmp/keyfile.json
-      displayName: 'Authenticate with GCP'
-
-    - script: |
-        google-play-publisher upload \
-          --packageName your.package.name \
-          --apk $(System.DefaultWorkingDirectory)/apk/app-release.apk \
-          --track production \
-          --key /tmp/keyfile.json
-      displayName: 'Deploy APK to Google Play'
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish APK as Build Artifact'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/apk'
+    ArtifactName: 'apk'
+    publishLocation: 'Container'
