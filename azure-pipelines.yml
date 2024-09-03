@@ -5,25 +5,5 @@ pool:
   vmImage: 'ubuntu-latest'
 
 steps:
-- checkout: self
-  fetchDepth: 1  # Fetch only the latest commit
-
-- task: Gradle@2
-  displayName: 'Build Release APK'
-  inputs:
-    workingDirectory: ''
-    gradleWrapperFile: 'gradlew'
-    tasks: 'assembleRelease'
-
-- task: CopyFiles@2
-  displayName: 'Copy APK to Staging Directory'
-  inputs:
-    contents: '**/*.apk'
-    targetFolder: '$(Build.ArtifactStagingDirectory)/apk'
-
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish APK as Build Artifact'
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)/apk'
-    ArtifactName: 'apk'
-    publishLocation: 'Container'
+- script: echo "Hello, World!"
+  displayName: 'Test Step'
