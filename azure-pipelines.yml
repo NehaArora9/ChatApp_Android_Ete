@@ -2,8 +2,11 @@ trigger:
 - main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: MySelfHostedAgents  # Use your self-hosted agent pool
 
 steps:
+- checkout: self
+  fetchDepth: 1
+
 - script: echo "Hello, World!"
   displayName: 'Test Step'
