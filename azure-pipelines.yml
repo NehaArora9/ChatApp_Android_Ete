@@ -1,0 +1,68 @@
+trigger:
+- main  # Trigger the pipeline on changes to the main branch
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildDir: 'app/build/outputs/apk/release'
+  apkFile: '$(buildDir)/app-release.apk'
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: BuildAPK
+    displayName: 'Build Android APK'
+    steps:
+    - task: Gradle@2
+      displayName: 'Build Release APK'
+      inputs:
+        workingDirectory: ''
+        gradleWrapperFile: 'gradlew'
+        tasks: 'assembleRelease'
+        options: ''
+        publishJUnitResults: true
+        testResultsFiles: '**/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.8'
+        jdkArchitectureOption: 'x64'
+
+    - task: CopyFiles@2
+      displayName: 'Copy APK to Staging Directory'
+      inputs:
+        contents: '**/*.apk'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/apk'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish APK as Artifact'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/apk'
+        ArtifactName: 'apk'
+        publishLocation: 'Container'
+
+- stage: Deploy
+  displayName: 'Deploy Stage'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: DeployAPK
+    displayName: 'Deploy APK to Google Play'
+    steps:
+    - script: |
+        curl -sSL https://sdk.cloud.google.com | bash
+        npm install -g google-play-publisher
+      displayName: 'Install gcloud and google-play-publisher'
+      
+    - script: |
+        echo $(serviceConnection:GooglePlayServiceAccount) > /tmp/keyfile.json
+        gcloud auth activate-service-account --key-file=/tmp/keyfile.json
+      displayName: 'Authenticate with GCP'
+
+    - script: |
+        google-play-publisher upload \
+          --packageName your.package.name \
+          --apk $(System.DefaultWorkingDirectory)/apk/app-release.apk \
+          --track production \
+          --key /tmp/keyfile.json
+      displayName: 'Deploy APK to Google Play'
