@@ -1,8 +1,8 @@
 trigger:
-- main  # Trigger the pipeline on changes to the main branch
+- main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: MySelfHostedAgents  # Use your self-hosted agent pool
 
 variables:
   buildDir: 'app/build/outputs/apk/release'
@@ -10,44 +10,26 @@ variables:
 
 stages:
 - stage: Build
-  displayName: 'Build Stage'
   jobs:
   - job: BuildAPK
-    displayName: 'Build Android APK'
     steps:
-    - task: Gradle@2
+    - script: |
+        ./gradlew assembleRelease
       displayName: 'Build Release APK'
-      inputs:
-        workingDirectory: ''
-        gradleWrapperFile: 'gradlew'
-        tasks: 'assembleRelease'
-        options: ''
-        publishJUnitResults: true
-        testResultsFiles: '**/TEST-*.xml'
-        javaHomeOption: 'JDKVersion'
-        jdkVersionOption: '1.8'
-        jdkArchitectureOption: 'x64'
-
-    - task: CopyFiles@2
+      
+    - script: |
+        mkdir -p $(Build.ArtifactStagingDirectory)/apk
+        cp $(buildDir)/*.apk $(Build.ArtifactStagingDirectory)/apk/
       displayName: 'Copy APK to Staging Directory'
-      inputs:
-        contents: '**/*.apk'
-        targetFolder: '$(Build.ArtifactStagingDirectory)/apk'
 
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publish APK as Artifact'
-      inputs:
-        PathtoPublish: '$(Build.ArtifactStagingDirectory)/apk'
-        ArtifactName: 'apk'
-        publishLocation: 'Container'
+    - publish: $(Build.ArtifactStagingDirectory)/apk
+      artifact: apk
 
 - stage: Deploy
-  displayName: 'Deploy Stage'
   dependsOn: Build
   condition: succeeded()
   jobs:
   - job: DeployAPK
-    displayName: 'Deploy APK to Google Play'
     steps:
     - script: |
         curl -sSL https://sdk.cloud.google.com | bash
